@@ -60,6 +60,7 @@ class Re3Tracker(object):
     def track(self, unique_id, image, starting_box=None):
         start_time = time.time()
 
+        #========== Get Image ==========
         if type(image) == str:
             image = cv2.imread(image)[:,:,::-1]
         else:
@@ -67,19 +68,22 @@ class Re3Tracker(object):
 
         image_read_time = time.time() - start_time
 
+        #========== If this is first time that we gave it a bbox ==========
         if starting_box is not None:
-            lstmState = [np.zeros((1, LSTM_SIZE)) for _ in range(4)]
+            lstmState = [np.zeros((1, LSTM_SIZE)) for _ in range(4)] # [X, X, X, X], initial lstm state with 4 value
             pastBBox = np.array(starting_box) # turns list into numpy array if not and copies for safety.
             prevImage = image
             originalFeatures = None
             forwardCount = 0
+
+        #========== If same ID, EX:'webcam' ==========
         elif unique_id in self.tracked_data:
             lstmState, pastBBox, prevImage, originalFeatures, forwardCount = self.tracked_data[unique_id]
         else:
             raise Exception('Unique_id %s with no initial bounding box' % unique_id)
 
         croppedInput0, pastBBoxPadded = im_util.get_cropped_input(prevImage, pastBBox, CROP_PAD, CROP_SIZE)
-        croppedInput1,_ = im_util.get_cropped_input(image, pastBBox, CROP_PAD, CROP_SIZE)
+        croppedInput1, _ = im_util.get_cropped_input(image, pastBBox, CROP_PAD, CROP_SIZE)
 
         feed_dict = {
                 self.imagePlaceholder : [croppedInput0, croppedInput1],
@@ -98,8 +102,9 @@ class Re3Tracker(object):
 
         if forwardCount > 0 and forwardCount % MAX_TRACK_LENGTH == 0:
             croppedInput, _ = im_util.get_cropped_input(image, outputBox, CROP_PAD, CROP_SIZE)
+            # croppedInput[np.newaxis,...]   (227,227,3) --> (1,227,227,3)
+            # np.tile(croppedInput[np.newaxis,...], (2,1,1,1))   (1,227,227,3) --> (2,227,227,3)
             input = np.tile(croppedInput[np.newaxis,...], (2,1,1,1))
-            print(input.shape)
             feed_dict = {
                     self.imagePlaceholder : input,
                     self.prevLstmState : originalFeatures,
