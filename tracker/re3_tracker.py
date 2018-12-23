@@ -84,7 +84,7 @@ class Re3Tracker(object):
 
         croppedInput0, pastBBoxPadded = im_util.get_cropped_input(prevImage, pastBBox, CROP_PAD, CROP_SIZE)
         croppedInput1, _ = im_util.get_cropped_input(image, pastBBox, CROP_PAD, CROP_SIZE)
-
+        #print(prevImage.shape, image.shape)
         feed_dict = {
                 self.imagePlaceholder : [croppedInput0, croppedInput1],
                 self.prevLstmState : lstmState,
@@ -92,6 +92,7 @@ class Re3Tracker(object):
                 }
         rawOutput, s1, s2 = self.sess.run([self.outputs, self.state1, self.state2], feed_dict=feed_dict)
         lstmState = [s1[0], s1[1], s2[0], s2[1]]
+        #print(s1[0])
         if forwardCount == 0:
             originalFeatures = [s1[0], s1[1], s2[0], s2[1]]
 
@@ -99,7 +100,9 @@ class Re3Tracker(object):
 
         # Shift output box to full image coordinate system.
         outputBox = bb_util.from_crop_coordinate_system(rawOutput.squeeze() / 10.0, pastBBoxPadded, 1, 1)
+        #print(outputBox, rawOutput)
 
+        # Reset LSTM state every 32 iterations to avoid drift
         if forwardCount > 0 and forwardCount % MAX_TRACK_LENGTH == 0:
             croppedInput, _ = im_util.get_cropped_input(image, outputBox, CROP_PAD, CROP_SIZE)
             # croppedInput[np.newaxis,...]   (227,227,3) --> (1,227,227,3)

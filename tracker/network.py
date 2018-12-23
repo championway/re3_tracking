@@ -101,13 +101,16 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
 
     with tf.variable_scope('re3', reuse=reuse):
         conv_layers = alexnet_conv_layers(inputs, batch_size, num_unrolls)
+        #print('conv_layers: ', conv_layers.get_shape().as_list())
 
         # Embed Fully Connected Layer
         with tf.variable_scope('fc6'):
             fc6_out = tf_util.fc_layer(conv_layers, 1024)
 
             # (BxT)xC
+            #print('fc6_out: ', fc6_out.get_shape().as_list())
             fc6_reshape = tf.reshape(fc6_out, tf.stack([batch_size, num_unrolls, fc6_out.get_shape().as_list()[-1]]))
+            #print('fc6_reshape: ', fc6_reshape.get_shape().as_list())
 
         # LSTM stuff
         swap_memory = num_unrolls > 1
@@ -139,6 +142,8 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
                     tf_util.variable_summaries(var, var.name[:-2])
             # (BxT)xC
             outputs_reshape = tf_util.remove_axis(lstm2_outputs, 1)
+            # lstm2_outputs --> (None, 1, 512)
+            # outputs_reshape --> (None, 512)
 
         # Final FC layer.
         with tf.variable_scope('fc_output'):
