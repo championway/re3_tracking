@@ -127,7 +127,7 @@ class Re3Tracker(object):
         end_time = time.time()
         if self.total_forward_count > 0:
             self.time += (end_time - start_time - image_read_time)
-        if SPEED_OUTPUT and self.total_forward_count % 100 == 0:
+        if SPEED_OUTPUT and self.total_forward_count % 10 == 0:
             print('Current tracking speed:   %.3f FPS' % (1 / (end_time - start_time - image_read_time)))
             print('Current image read speed: %.3f FPS' % (1 / (image_read_time)))
             print('Mean tracking speed:      %.3f FPS\n' % (self.total_forward_count / max(.00001, self.time)))

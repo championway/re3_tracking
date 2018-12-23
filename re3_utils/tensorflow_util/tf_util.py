@@ -95,6 +95,7 @@ def fc_layer(input, num_channels, activation=tf.nn.relu,
     if bias_initializer is None:
         bias_initializer = tf.zeros_initializer()
     input_shape = input.get_shape().as_list()
+    # len(input_shape) ==> 2
     if len(input_shape) > 2:
         input = tf.reshape(input, [-1, np.prod(input_shape[1:])])
         input_shape = input.get_shape().as_list()

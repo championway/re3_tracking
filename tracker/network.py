@@ -100,20 +100,23 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
         reuse = None
 
     with tf.variable_scope('re3', reuse=reuse):
+        # [None, 74208]
         conv_layers = alexnet_conv_layers(inputs, batch_size, num_unrolls)
         #print('conv_layers: ', conv_layers.get_shape().as_list())
 
         # Embed Fully Connected Layer
         with tf.variable_scope('fc6'):
+            # [None, 1024]
             fc6_out = tf_util.fc_layer(conv_layers, 1024)
-
-            # (BxT)xC
             #print('fc6_out: ', fc6_out.get_shape().as_list())
+            # (BxT)xC
+
+            # [None, 1, 1024]
             fc6_reshape = tf.reshape(fc6_out, tf.stack([batch_size, num_unrolls, fc6_out.get_shape().as_list()[-1]]))
             #print('fc6_reshape: ', fc6_reshape.get_shape().as_list())
 
         # LSTM stuff
-        swap_memory = num_unrolls > 1
+        swap_memory = num_unrolls > 1 # swap_memory ==> Bool
         with tf.variable_scope('lstm1'):
             #lstm1 = CaffeLSTMCell(LSTM_SIZE, initializer=msra_initializer)
             lstm1 = tf.contrib.rnn.LSTMCell(LSTM_SIZE, use_peepholes=True, initializer=msra_initializer, reuse=reuse)
@@ -126,6 +129,7 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
                 lstmVars = [var for var in tf.trainable_variables() if 'lstm1' in var.name]
                 for var in lstmVars:
                     tf_util.variable_summaries(var, var.name[:-2])
+            # lstm1_outputs --> (None, 1, 512)
 
         with tf.variable_scope('lstm2'):
             #lstm2 = CaffeLSTMCell(LSTM_SIZE, initializer=msra_initializer)
@@ -142,12 +146,14 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
                     tf_util.variable_summaries(var, var.name[:-2])
             # (BxT)xC
             outputs_reshape = tf_util.remove_axis(lstm2_outputs, 1)
-            # lstm2_outputs --> (None, 1, 512)
+            # lstm2_inputs --> ( None, 1, 1536(1024 + 512) )
+            # lstm2_outputs --> ( None, 1, 512)
             # outputs_reshape --> (None, 512)
 
         # Final FC layer.
         with tf.variable_scope('fc_output'):
             fc_output_out = tf_util.fc_layer(outputs_reshape, 4, activation=None)
+            # fc_output_out --> ( None, 4)
 
     if prevLstmState is not None:
         return fc_output_out, state1, state2
