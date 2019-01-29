@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 import torchvision.models as models
+import torchvision
 import torch.nn.modules.normalization as norm
 from torch.autograd import Variable
 from process_data import ALOVDataset
@@ -72,101 +73,56 @@ class Flatten(nn.Module):
 class alexnet_conv_layers(nn.Module):
     def __init__(self):
         super(alexnet_conv_layers, self).__init__()
-        input_channels = 3
-        
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(input_channels, out_channels=96, kernel_size=11, stride=4),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            norm.LocalResponseNorm(size=2, alpha=2e-5, beta=0.75, k=1.0)
-        )
+        self.base_features = torchvision.models.alexnet(pretrained = True).features
         self.skip1 = nn.Sequential(
-            nn.Conv2d(96, out_channels=16, kernel_size=1, stride=1),
+            nn.Conv2d(64, out_channels=16, kernel_size=1, stride=1),
             nn.PReLU(),
             Flatten()
         )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=96, out_channels=256, groups=2, kernel_size=5, padding=2),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            norm.LocalResponseNorm(size=2, alpha=2e-5, beta=0.75, k=1.0)
-        )
-
         self.skip2 = nn.Sequential(
-            nn.Conv2d(256, out_channels=32, kernel_size=1, stride=1),
+            nn.Conv2d(192, out_channels=32, kernel_size=1, stride=1),
             nn.PReLU(),
             Flatten()
         )
-
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=384, kernel_size=3, padding=1),
-            nn.ReLU()
-        )
-
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=384, out_channels=384, kernel_size=3, padding=1, groups=2),
-            nn.ReLU()
-        )
-
-        self.conv5 = nn.Sequential(
-            nn.Conv2d(in_channels=384, out_channels=256, kernel_size=3, padding=1, groups=2),
-            nn.ReLU()
-        )
-
-        self.pool5 = nn.Sequential(
-            nn.MaxPool2d(kernel_size=3, stride=2)
-        )
-
-        self.conv5_flat = nn.Sequential(
-            Flatten()
-        )
-
         self.skip5 = nn.Sequential(
             nn.Conv2d(256, out_channels=64, kernel_size=1, stride=1),
             nn.PReLU(),
             Flatten()
         )
-
         self.conv6 = nn.Sequential(
             nn.Linear(37104 * 2, 2048),
             nn.ReLU()
         )
+        '''
+        # Freeze those weights
+        for p in self.features.parameters():
+            p.requires_grad = False
+        '''
 
     def forward(self, x, y):
-        x_out1 = self.conv1(x)
-        x_out_skip1 = self.skip1(x_out1)
-
-        x_out2 = self.conv2(x_out1)
-        x_out_skip2 = self.skip2(x_out2)
-
-        x_out3 = self.conv3(x_out2)
-        x_out4 = self.conv4(x_out3)
-        x_out5 = self.conv5(x_out4)
-
-        x_out_skip5 = self.skip5(x_out5)
-
-        x_out_pool =self.pool5(x_out5)
-        x_out_pool = self.conv5_flat( x_out_pool)
-        x_out = torch.cat((x_out_skip1, x_out_skip2, x_out_skip5, x_out_pool), dim=1)
-
-        y_out1 = self.conv1(y)
-        y_out_skip1 = self.skip1(y_out1)
-
-        y_out2 = self.conv2(y_out1)
-        y_out_skip2 = self.skip2(y_out2)
-
-        y_out3 = self.conv3(y_out2)
-        y_out4 = self.conv4(y_out3)
-        y_out5 = self.conv5(y_out4)
-
-        y_out_skip5 = self.skip5(y_out5)
-
-        y_out_pool =self.pool5(y_out5)
-        y_out_pool = self.conv5_flat(y_out_pool)
-        y_out = torch.cat((y_out_skip1, y_out_skip2, y_out_skip5, y_out_pool), dim=1)
-
+        layer_extractor_x = []
+        layer_extractor_y = []
+        for idx, model in enumerate(self.base_features):
+            x = model(x)
+            y = model(y)
+            if idx in {2, 5, 11}: # layer output of conv1, conv2 , conv5(before pooling layer)
+                layer_extractor_x.append(x)
+                layer_extractor_y.append(y)
+                
+        x_out_flat = x.view(1, -1) #(1, 256, 6, 6) --> (1, 9216)
+        x_out_skip1 = self.skip1(layer_extractor_x[0]) #(1, 64, 27, 27) -> (11664)
+        x_out_skip2 = self.skip2(layer_extractor_x[1]) #(1, 192, 13, 13) -> (5408)
+        x_out_skip5 = self.skip5(layer_extractor_x[2]) #(1, 256, 13, 13) -> (10816)
+        x_out = torch.cat((x_out_skip1, x_out_skip2, x_out_skip5, x_out_flat), dim=1)
+        
+        y_out_flat = y.view(1, -1) #(1, 256, 6, 6) --> (1, 9216)
+        y_out_skip1 = self.skip1(layer_extractor_y[0]) #(1, 64, 27, 27) -> (11664)
+        y_out_skip2 = self.skip2(layer_extractor_y[1]) #(1, 192, 13, 13) -> (5408)
+        y_out_skip5 = self.skip5(layer_extractor_y[2]) #(1, 256, 13, 13) -> (10816)
+        y_out = torch.cat((y_out_skip1, y_out_skip2, y_out_skip5, y_out_flat), dim=1)
+        
         final_out = torch.cat((x_out, y_out), dim=1)
-        conv_out = self.conv6(final_out)
+        conv_out = self.conv6(final_out) # (1, 2048)
         return conv_out
 
 

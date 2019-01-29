@@ -13,7 +13,6 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 import torchvision.models as models
-import torchvision
 import torch.nn.modules.normalization as norm
 from torch.autograd import Variable
 from process_data import ALOVDataset
@@ -69,63 +68,10 @@ class Flatten(nn.Module):
 
 
 # In[5]:
-class alexnet_conv_layers(nn.Module):
-    def __init__(self):
-        super(alexnet_conv_layers, self).__init__()
-        self.base_features = torchvision.models.alexnet(pretrained = True).features
-        self.skip1 = nn.Sequential(
-            nn.Conv2d(64, out_channels=16, kernel_size=1, stride=1),
-            nn.PReLU(),
-            Flatten()
-        )
-        self.skip2 = nn.Sequential(
-            nn.Conv2d(192, out_channels=32, kernel_size=1, stride=1),
-            nn.PReLU(),
-            Flatten()
-        )
-        self.skip5 = nn.Sequential(
-            nn.Conv2d(256, out_channels=64, kernel_size=1, stride=1),
-            nn.PReLU(),
-            Flatten()
-        )
-        self.conv6 = nn.Sequential(
-            nn.Linear(37104 * 2, 2048),
-            nn.ReLU()
-        )
-        '''
-        # Freeze those weights
-        for p in self.features.parameters():
-            p.requires_grad = False
-        '''
 
-    def forward(self, x, y):
-        layer_extractor_x = []
-        layer_extractor_y = []
-        for idx, model in enumerate(self.base_features):
-            x = model(x)
-            y = model(y)
-            if idx in {2, 5, 11}: # layer output of conv1, conv2 , conv5(before pooling layer)
-                layer_extractor_x.append(x)
-                layer_extractor_y.append(y)
-                
-        x_out_flat = x.view(1, -1) #(1, 256, 6, 6) --> (1, 9216)
-        x_out_skip1 = self.skip1(layer_extractor_x[0]) #(1, 64, 27, 27) -> (11664)
-        x_out_skip2 = self.skip2(layer_extractor_x[1]) #(1, 192, 13, 13) -> (5408)
-        x_out_skip5 = self.skip5(layer_extractor_x[2]) #(1, 256, 13, 13) -> (10816)
-        x_out = torch.cat((x_out_skip1, x_out_skip2, x_out_skip5, x_out_flat), dim=1)
-        
-        y_out_flat = y.view(1, -1) #(1, 256, 6, 6) --> (1, 9216)
-        y_out_skip1 = self.skip1(layer_extractor_y[0]) #(1, 64, 27, 27) -> (11664)
-        y_out_skip2 = self.skip2(layer_extractor_y[1]) #(1, 192, 13, 13) -> (5408)
-        y_out_skip5 = self.skip5(layer_extractor_y[2]) #(1, 256, 13, 13) -> (10816)
-        y_out = torch.cat((y_out_skip1, y_out_skip2, y_out_skip5, y_out_flat), dim=1)
-        
-        final_out = torch.cat((x_out, y_out), dim=1)
-        conv_out = self.conv6(final_out) # (1, 2048)
-        return conv_out
 
 #alexnet = models.alexnet(pretrained=True)
-class alexnet_conv_layers_(nn.Module):
+class alexnet_conv_layers(nn.Module):
     def __init__(self):
         super(alexnet_conv_layers, self).__init__()
         input_channels = 3
@@ -232,6 +178,7 @@ class alexnet_conv_layers_(nn.Module):
 class Re3Net(nn.Module):
     def __init__(self):
         super(Re3Net,self).__init__()
+        torch.cuda.empty_cache()
         self.conv_layers = alexnet_conv_layers()
         
         #2048 from conv_layers? maybe 1024?
@@ -246,37 +193,46 @@ class Re3Net(nn.Module):
         self.h2 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
         self.c2 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
 
-    def init_hidden(self):
-        self.h1 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
-        self.c1 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
-        
-        self.h2 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
-        self.c2 = Variable(torch.rand(1, LSTM_SIZE)).cuda()
-
-    def detach_hidden(self):
-        self.h1 = self.h1.detach()
-        self.c1 = self.c1.detach()
-        
-        self.h2 = self.h2.detach()
-        self.c2 = self.c2.detach()
-
-    def forward(self, x, y):
+    def forward(self, x, y, lstm_state=None):
         out = self.conv_layers(x, y)
+        
+        if lstm_state is None:
+            self.h1 = Variable(torch.rand(x.shape[0], LSTM_SIZE)).cuda()
+            self.c1 = Variable(torch.rand(x.shape[0], LSTM_SIZE)).cuda()
+            self.h2 = Variable(torch.rand(x.shape[0], LSTM_SIZE)).cuda()
+            self.c2 = Variable(torch.rand(x.shape[0], LSTM_SIZE)).cuda()
+        else:
+            self.h1 = lstm_state[0]
+            self.c1 = lstm_state[1]
+            self.h2 = lstm_state[2]
+            self.c2 = lstm_state[3]
+        #print(self.h1.cpu().numpy()[0][0])
+        #print(self.c1.cpu().numpy()[0][0])
+        #print(self.h2.cpu().numpy()[0][0])
+        #print(self.c2.cpu().numpy()[0][0])
+        h1_, c1_ = self.lstm1(out, (self.h1, self.c1))
 
-        lstm1_out, self.h1 = self.lstm1(out, (self.h1, self.c1))
+        lstm2_in = torch.cat((out, h1_), dim=1)
 
-        lstm2_in = torch.cat((out, lstm1_out), dim=1)
+        h2_, c2_ = self.lstm2(lstm2_in, (self.h2, self.c2))
 
-        lstm2_out, self.h2 = self.lstm2(lstm2_in, (self.h2, self.c2))
-
-        out = self.fc_final(lstm2_out)
-        return out
+        out = self.fc_final(h2_)
+        h1_ = h1_.detach()
+        c1_ = c1_.detach()
+        h2_ = h2_.detach()
+        c2_ = c2_.detach()
+        #print(h1_.cpu().numpy()[0][0])
+        #print(c1_.cpu().numpy()[0][0])
+        #print(h2_.cpu().numpy()[0][0])
+        #print(c2_.cpu().numpy()[0][0])
+        #print('======')
+        return out, [h1_, c1_, h2_, c2_]
 
 
 class Re3Tracker(object):
     def __init__(self):
         basedir = os.path.dirname(__file__)
-        model_path = '/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_0_loss_3.582.pth'
+        model_path = '../saved_models_lstmmm/_batch_90_loss_0.241.pth'
         #self.imagePlaceholder = tf.placeholder(tf.uint8, shape=(None, CROP_SIZE, CROP_SIZE, 3))
         #self.prevLstmState = tuple([tf.placeholder(tf.float32, shape=(None, LSTM_SIZE)) for _ in range(4)])
         #self.batch_size = tf.placeholder(tf.int32, shape=())
@@ -341,7 +297,7 @@ class Re3Tracker(object):
                 self.batch_size : 1,
                 }'''
         #rawOutput, s1, s2 = self.sess.run([self.outputs, self.state1, self.state2], feed_dict=feed_dict)
-        rawOutput = self.net(croppedInput0.cuda(), croppedInput1.cuda())
+        rawOutput, self.lstmState = self.net(croppedInput0.cuda(), croppedInput1.cuda(), self.lstmState)
         rawOutput = rawOutput.cpu().detach().numpy()
         #s1 = s1.cpu().detach().numpy()
         #s2 = s2.cpu().detach().numpy()
@@ -370,7 +326,7 @@ class Re3Tracker(object):
                     self.batch_size : 1,
                     }'''
             #rawOutput, s1, s2 = self.sess.run([self.outputs, self.state1, self.state2], feed_dict=feed_dict)
-            rawOutput = self.net(croppedInput0.cuda(), croppedInput1.cuda())
+            rawOutput, self.lstmState = self.net(croppedInput0.cuda(), croppedInput1.cuda(), None)
             rawOutput = rawOutput.cpu().detach().numpy()
             #s1 = s1.cpu().detach().numpy()
             #s2 = s2.cpu().detach().numpy()

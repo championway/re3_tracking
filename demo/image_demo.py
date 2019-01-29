@@ -6,7 +6,7 @@ import os.path
 
 basedir = os.path.dirname(__file__)
 sys.path.append(os.path.abspath(os.path.join(basedir, os.path.pardir)))
-from tracker import re3_tracker
+from tracker import re3_tracker, re3_tracker_pytorch
 
 if not os.path.exists(os.path.join(basedir, 'data')):
     import tarfile
@@ -15,7 +15,8 @@ if not os.path.exists(os.path.join(basedir, 'data')):
 
 cv2.namedWindow('Image', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('Image', 640, 480)
-tracker = re3_tracker.Re3Tracker()
+#tracker = re3_tracker.Re3Tracker()
+tracker = re3_tracker_pytorch.Re3Tracker()
 image_paths = sorted(glob.glob(os.path.join(
     os.path.dirname(__file__), 'data', '*.jpg')))
 initial_bbox = [175, 154, 251, 229]
