@@ -101,6 +101,7 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
 
     with tf.variable_scope('re3', reuse=reuse):
         # [None, 74208]
+        #print('inputs: ', inputs.get_shape().as_list())
         conv_layers = alexnet_conv_layers(inputs, batch_size, num_unrolls)
         #print('conv_layers: ', conv_layers.get_shape().as_list())
 
@@ -124,6 +125,11 @@ def inference(inputs, num_unrolls, train, batch_size=None, prevLstmState=None, r
                 state1 = tf.contrib.rnn.LSTMStateTuple(prevLstmState[0], prevLstmState[1])
             else:
                 state1 = lstm1.zero_state(batch_size, dtype=tf.float32)
+            print('prevLstmState: ', prevLstmState[0].shape)
+            print('state1: ', state1[0].shape)
+            #print('prevLstmState[0]: ', prevLstmState[0].shape)
+            #print('prevLstmState[1]: ', prevLstmState[1].shape)
+            #print('state1: ', state1.get_shape().as_list())
             lstm1_outputs, state1 = tf.nn.dynamic_rnn(lstm1, fc6_reshape, initial_state=state1, swap_memory=swap_memory)
             if train:
                 lstmVars = [var for var in tf.trainable_variables() if 'lstm1' in var.name]

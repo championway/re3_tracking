@@ -91,6 +91,7 @@ class Re3Tracker(object):
                 self.batch_size : 1,
                 }
         rawOutput, s1, s2 = self.sess.run([self.outputs, self.state1, self.state2], feed_dict=feed_dict)
+        
         lstmState = [s1[0], s1[1], s2[0], s2[1]]
         #print(s1[0])
         if forwardCount == 0:

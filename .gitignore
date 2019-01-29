@@ -2,3 +2,4 @@ logs/
 demo/data/
 *.pyc
 .ipynb_checkpoints/
+*.pth

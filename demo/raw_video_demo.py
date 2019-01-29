@@ -8,7 +8,7 @@ import sys
 
 basedir = os.path.dirname(__file__)
 sys.path.append(os.path.abspath(os.path.join(basedir, os.path.pardir)))
-from tracker import re3_tracker
+from tracker import re3_tracker, re3_tracker_pytorch
 
 from re3_utils.util import drawing
 from re3_utils.util import bb_util
@@ -125,7 +125,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     RECORD = args.record
 
-    tracker = re3_tracker.Re3Tracker()
+    #tracker = re3_tracker.Re3Tracker()
+    tracker = re3_tracker_pytorch.Re3Tracker()
 
     show_webcam(mirror=False)
 
