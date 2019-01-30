@@ -93,11 +93,11 @@ class alexnet_conv_layers(nn.Module):
             nn.Linear(37104 * 2, 2048),
             nn.ReLU()
         )
-        '''
+        
         # Freeze those weights
-        for p in self.features.parameters():
+        for p in self.base_features.parameters():
             p.requires_grad = False
-        '''
+        
 
     def forward(self, x, y):
         layer_extractor_x = []
@@ -426,7 +426,7 @@ dataloader = DataLoader(alov, batch_size = 1)
 net = Re3Net().cuda()
 loss_function = torch.nn.L1Loss(size_average=False).cuda()
 optimizer = optim.Adam(net.parameters(), lr=0.00001, weight_decay=0.0005)
-
+#net.load_state_dict(torch.load("/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_0_loss_3.582.pth"))
 
 # In[15]:
 
