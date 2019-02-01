@@ -262,9 +262,9 @@ def evaluate(model, dataloader, criterion, epoch):
         #print(y.size()) # [4]
         output = output.view(4)
         loss = criterion(output, y)
-        total_loss += loss.data[0]
+        total_loss += loss.item()
         if i % 10 == 0:
-            print('[validation] epoch = %d, i = %d, loss = %f' % (epoch, i, loss.data[0]))
+            print('[validation] epoch = %d, i = %d, loss = %f' % (epoch, i, loss.item()))
 
     seq_loss = total_loss/64
     return seq_loss
@@ -295,12 +295,12 @@ def train(model, optimizer, loss_fn, dataloader, metrics, params):
             output = output.data.cpu().numpy()
             # compute all metrics on this batch
             summary_batch = {}
-            summary_batch['loss'] = loss.data[0]
+            summary_batch['loss'] = loss.item()
             summ.append(summary_batch)
-            logging.info('- Average Loss for iteration {} is {}'.format(i,loss.data[0]/params.batch_size))
+            logging.info('- Average Loss for iteration {} is {}'.format(i,loss.item()/params.batch_size))
 
         # update the average loss
-        loss_avg.update(loss.data[0])
+        loss_avg.update(loss.item())
         counter+=1
 
     print(counter)
@@ -340,12 +340,12 @@ def train_model(net, dataloader, optim, loss_function, num_epochs):
             loss.backward(retain_graph=True)
             optim.step()
             if i%20 == 0:
-                print('[training] epoch = %d, i = %d/%d, loss = %f' % (epoch, i, dataset_size			,loss.data[0]) )
+                print('[training] epoch = %d, i = %d/%d, loss = %f' % (epoch, i, dataset_size, loss.item()) )
                 sys.stdout.flush()
             if i%40 == 0:
                 net.detach_hidden()
             i = i + 1
-            curr_loss += loss.data[0]
+            curr_loss += loss.item()
         epoch_loss = curr_loss / dataset_size
         print('Loss: {:.4f}'.format(epoch_loss))
         
@@ -414,7 +414,6 @@ num_epochs = 100
 
 
 # In[13]:
-
 
 alov = ALOVDataset('/media/arg_ws3/5E703E3A703E18EB/data/alov/imagedata++/', '/media/arg_ws3/5E703E3A703E18EB/data/alov/alov300++_rectangleAnnotation_full/', transform)
 dataloader = DataLoader(alov, batch_size = 1)
