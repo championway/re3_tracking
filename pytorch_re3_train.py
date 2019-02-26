@@ -425,7 +425,7 @@ dataloader = DataLoader(alov, batch_size = 1)
 net = Re3Net().cuda()
 loss_function = torch.nn.L1Loss(size_average=False).cuda()
 optimizer = optim.Adam(net.parameters(), lr=0.00001, weight_decay=0.0005)
-#net.load_state_dict(torch.load("/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_0_loss_3.582.pth"))
+net.load_state_dict(torch.load("/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_1_loss_2.952.pth"))
 
 # In[15]:
 
