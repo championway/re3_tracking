@@ -276,7 +276,7 @@ class Re3Net(nn.Module):
 class Re3Tracker(object):
     def __init__(self):
         basedir = os.path.dirname(__file__)
-        model_path = '/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_72_loss_0.439.pth'
+        model_path = '/home/arg_ws3/re3_tracking/pytorch_model/_batch_4_loss_3.048.pth'
         #self.imagePlaceholder = tf.placeholder(tf.uint8, shape=(None, CROP_SIZE, CROP_SIZE, 3))
         #self.prevLstmState = tuple([tf.placeholder(tf.float32, shape=(None, LSTM_SIZE)) for _ in range(4)])
         #self.batch_size = tf.placeholder(tf.int32, shape=())

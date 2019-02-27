@@ -270,53 +270,27 @@ def evaluate(model, dataloader, criterion, epoch):
     return seq_loss
 
 
-# In[9]:
-
-
-def train(model, optimizer, loss_fn, dataloader, metrics, params):
-    # set model to training mode
-    model.train()
-
-    # summary for current training loop and a running average object for loss
-    summ = []
-    loss_avg = RunningAverage()
-    counter=0
-    for i,data in enumerate(dataloader):
-        optimizer.zero_grad()
-        x1, x2, y = data['previmg'], data['currimg'], data['currbb']
-        output = model(x1, x2)
-        loss = loss_fn(output, y)
-        loss.backward(retain_graph=True)
-        #loss.backward(retain_graph=False)
-        # performs updates using calculated gradients
-        optimizer.step()
-        if i % params.save_summary_steps == 0:
-            # extract data from torch Variable, move to cpu, convert to numpy arrays
-            output = output.data.cpu().numpy()
-            # compute all metrics on this batch
-            summary_batch = {}
-            summary_batch['loss'] = loss.item()
-            summ.append(summary_batch)
-            logging.info('- Average Loss for iteration {} is {}'.format(i,loss.item()/params.batch_size))
-
-        # update the average loss
-        loss_avg.update(loss.item())
-        counter+=1
-
-    print(counter)
-    # compute mean of all metrics in summary
-    metrics_mean = {metric: np.mean([x[metric] for x in summ]) for metric in summ[0]}
-    metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_mean.items())
-    logging.info("- Train metrics: " + metrics_string)
-
-
 # In[10]:
+
+# Adjust learning rate during training
+def adjust_learning_rate(optimizer):
+    """Sets the learning rate to the initial LR decayed by 10 at every
+        specified step
+    # Adapted from PyTorch Imagenet example:
+    # https://github.com/pytorch/examples/blob/master/imagenet/main.py
+    """
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = param_group['lr'] * 0.1
+        print("Change learning rate to: ", param_group['lr'])
 
 
 def train_model(net, dataloader, optim, loss_function, num_epochs):
 
     dataset_size = dataloader.dataset.len
     for epoch in range(num_epochs):
+        if epoch != 0 and epoch % 5 == 0:
+            adjust_learning_rate(optim)
+
         net.train()
         curr_loss = 0.0
 
@@ -342,8 +316,8 @@ def train_model(net, dataloader, optim, loss_function, num_epochs):
             if i%20 == 0:
                 print('[training] epoch = %d, i = %d/%d, loss = %f' % (epoch, i, dataset_size, loss.item()) )
                 sys.stdout.flush()
-            if i%40 == 0:
-                net.detach_hidden()
+            if i%32 == 0:
+                net.init_hidden()
             i = i + 1
             curr_loss += loss.item()
         epoch_loss = curr_loss / dataset_size
@@ -406,9 +380,9 @@ transform = transforms.Compose([Normalize(), ToTensor()])
 # In[12]:
 
 
-save_directory = 'saved_models_pytorch/'
+save_directory = 'pytorch_model/'
 save_model_step = 5
-learning_rate = 0.00001
+learning_rate = 0.001
 use_gpu = True
 num_epochs = 100
 
@@ -424,8 +398,8 @@ dataloader = DataLoader(alov, batch_size = 1)
 
 net = Re3Net().cuda()
 loss_function = torch.nn.L1Loss(size_average=False).cuda()
-optimizer = optim.Adam(net.parameters(), lr=0.00001, weight_decay=0.0005)
-net.load_state_dict(torch.load("/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_1_loss_2.952.pth"))
+optimizer = optim.Adam(net.parameters(), lr=learning_rate, weight_decay=0.0005)
+#net.load_state_dict(torch.load("/home/arg_ws3/re3_tracking/saved_models_pytorch/_batch_1_loss_2.952.pth"))
 
 # In[15]:
 
